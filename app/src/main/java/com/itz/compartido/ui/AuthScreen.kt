@@ -5,11 +5,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.itz.compartido.data.ItzRepository
+import kotlinx.coroutines.launch
 
 @Composable
 fun AuthScreen() {
@@ -35,15 +37,16 @@ fun AuthScreen() {
 
 @Composable
 private fun LoginForm() {
+    val scope = rememberCoroutineScope()
     var correo by rememberSaveable { mutableStateOf("") }
     var pass by rememberSaveable { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     Campo(correo, { correo = it }, "Correo institucional", KeyboardType.Email)
     Campo(pass, { pass = it }, "Contraseña", password = true)
     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-    Button(onClick = {
+    Button(onClick = { scope.launch {
         ItzRepository.login(correo, pass).onFailure { error = it.message }
-    }, modifier = Modifier.fillMaxWidth()) { Text("Entrar") }
+     } }, modifier = Modifier.fillMaxWidth()) { Text("Entrar") }
 
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -58,6 +61,7 @@ private fun LoginForm() {
 
 @Composable
 private fun RegistroForm() {
+    val scope = rememberCoroutineScope()
     var nombre by rememberSaveable { mutableStateOf("") }
     var matricula by rememberSaveable { mutableStateOf("") }
     var correo by rememberSaveable { mutableStateOf("") }
@@ -82,9 +86,9 @@ private fun RegistroForm() {
         )
     }
     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-    Button(onClick = {
-        if (!acepto) { error = "Debes aceptar el aviso de privacidad y el deslinde"; return@Button }
+    Button(onClick = { scope.launch {
+        if (!acepto) { error = "Debes aceptar el aviso de privacidad y el deslinde"; return@launch }
         ItzRepository.registrar(nombre, matricula, correo, tel, contacto, pass)
             .onFailure { error = it.message }
-    }, modifier = Modifier.fillMaxWidth()) { Text("Crear cuenta") }
+     } }, modifier = Modifier.fillMaxWidth()) { Text("Crear cuenta") }
 }

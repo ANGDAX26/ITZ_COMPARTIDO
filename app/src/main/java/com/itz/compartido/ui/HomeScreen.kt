@@ -10,14 +10,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.itz.compartido.data.ItzRepository
-import com.itz.compartido.model.*
 import kotlinx.coroutines.launch
+import com.itz.compartido.model.*
 
 @Composable
 fun HomeScreen(onAbrirViaje: (Int) -> Unit) {
@@ -62,6 +63,7 @@ fun HomeScreen(onAbrirViaje: (Int) -> Unit) {
 // ============ RF-04 / RF-05: buscar y solicitar ============
 @Composable
 private fun BuscarTab(yo: Usuario, mostrar: (String) -> Unit) {
+    val scope = rememberCoroutineScope()
     val viajes by ItzRepository.viajes.collectAsState()
     val solicitudes by ItzRepository.solicitudes.collectAsState()
     val usuarios by ItzRepository.usuarios.collectAsState()
@@ -119,11 +121,11 @@ private fun BuscarTab(yo: Usuario, mostrar: (String) -> Unit) {
                     }
                     Button(
                         enabled = activa == null,
-                        onClick = {
+                        onClick = { scope.launch {
                             ItzRepository.solicitarLugar(v.idViaje, yo.idUsuario)
                                 .onSuccess { mostrar("Solicitud enviada al conductor") }
                                 .onFailure { mostrar(it.message ?: "Error") }
-                        }
+                         } }
                     ) { Text(if (activa == null) "Solicitar lugar" else if (activa.estado == EstadoSolicitud.PENDIENTE) "Solicitud enviada" else "Lugar aceptado") }
                 }
             }
@@ -153,6 +155,7 @@ private fun ConducirTab(yo: Usuario, mostrar: (String) -> Unit) {
 
 @Composable
 private fun RegistroConductor(yo: Usuario, mostrar: (String) -> Unit) {
+    val scope = rememberCoroutineScope()
     var placas by rememberSaveable { mutableStateOf("") }
     var modelo by rememberSaveable { mutableStateOf("") }
     var color by rememberSaveable { mutableStateOf("") }
@@ -167,15 +170,16 @@ private fun RegistroConductor(yo: Usuario, mostrar: (String) -> Unit) {
     Campo(asientos, { asientos = it }, "Asientos para pasajeros (1 a 6)", KeyboardType.Number)
     Campo(licencia, { licencia = it }, "Número de licencia")
     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-    Button(onClick = {
+    Button(onClick = { scope.launch {
         ItzRepository.registrarConductor(yo.idUsuario, placas, modelo, color, asientos.toIntOrNull(), licencia)
             .onSuccess { mostrar("Solicitud enviada. Documentos en revisión") }
             .onFailure { error = it.message }
-    }, modifier = Modifier.fillMaxWidth()) { Text("Enviar para validación") }
+     } }, modifier = Modifier.fillMaxWidth()) { Text("Enviar para validación") }
 }
 
 @Composable
 private fun PublicarViaje(yo: Usuario, mostrar: (String) -> Unit) {
+    val scope = rememberCoroutineScope()
     var haciaItz by rememberSaveable { mutableStateOf(true) }
     var zona by rememberSaveable { mutableStateOf(ItzRepository.ZONAS.keys.first()) }
     var punto by rememberSaveable { mutableStateOf("") }
@@ -204,16 +208,17 @@ private fun PublicarViaje(yo: Usuario, mostrar: (String) -> Unit) {
         TipoPago.values().forEach { FilterChip(tipo == it, { tipo = it }, label = { Text(it.etiqueta) }) }
     }
     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-    Button(onClick = {
+    Button(onClick = { scope.launch {
         ItzRepository.publicarViaje(yo.idUsuario, zona, haciaItz, punto, hora, asientos.toIntOrNull(), costo.toDoubleOrNull(), tipo)
             .onSuccess { error = null; mostrar("Viaje publicado. Búscalo en Mis viajes"); punto = ""; asientos = ""; costo = "" }
             .onFailure { error = it.message }
-    }, modifier = Modifier.fillMaxWidth()) { Text("Publicar viaje") }
+     } }, modifier = Modifier.fillMaxWidth()) { Text("Publicar viaje") }
 }
 
 // ============ Mis viajes ============
 @Composable
 private fun MisViajesTab(yo: Usuario, mostrar: (String) -> Unit, abrir: (Int) -> Unit) {
+    val scope = rememberCoroutineScope()
     val viajes by ItzRepository.viajes.collectAsState()
     val solicitudes by ItzRepository.solicitudes.collectAsState()
     val usuarios by ItzRepository.usuarios.collectAsState()
@@ -238,9 +243,9 @@ private fun MisViajesTab(yo: Usuario, mostrar: (String) -> Unit, abrir: (Int) ->
                         if (s.estado == EstadoSolicitud.ACEPTADA && v.estado != EstadoViaje.PROGRAMADO && v.estado != EstadoViaje.CANCELADO)
                             Button(onClick = { abrir(v.idViaje) }) { Text(if (v.estado == EstadoViaje.EN_CURSO) "Ver ruta en vivo" else "Resumen y calificar") }
                         if ((s.estado == EstadoSolicitud.PENDIENTE || s.estado == EstadoSolicitud.ACEPTADA) && v.estado == EstadoViaje.PROGRAMADO)
-                            OutlinedButton(onClick = {
+                            OutlinedButton(onClick = { scope.launch {
                                 ItzRepository.cancelarSolicitud(s.idSolicitud).onFailure { mostrar(it.message ?: "Error") }
-                            }) { Text("Cancelar") }
+                             } }) { Text("Cancelar") }
                     }
                 }
             }
@@ -262,10 +267,12 @@ private fun MisViajesTab(yo: Usuario, mostrar: (String) -> Unit, abrir: (Int) ->
                         pendientes.forEach { s ->
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text(ItzRepository.nombreDe(s.pasajeroId) + " solicita lugar", Modifier.weight(1f))
-                                IconButton(onClick = { ItzRepository.responderSolicitud(s.idSolicitud, true).onFailure { mostrar(it.message ?: "Error") } }) {
+                                IconButton(onClick = { scope.launch {  ItzRepository.responderSolicitud(s.idSolicitud, true).onFailure { mostrar(it.message ?: "Error") }  } }) {
                                     Icon(Icons.Default.Check, contentDescription = "Aceptar", tint = MaterialTheme.colorScheme.primary)
                                 }
-                                IconButton(onClick = { ItzRepository.responderSolicitud(s.idSolicitud, false) }) {
+                                IconButton(onClick = { scope.launch {
+                                    ItzRepository.responderSolicitud(s.idSolicitud, false).onFailure { mostrar(it.message ?: "Error") }
+                                } }) {
                                     Icon(Icons.Default.Close, contentDescription = "Rechazar", tint = MaterialTheme.colorScheme.error)
                                 }
                             }
@@ -273,12 +280,12 @@ private fun MisViajesTab(yo: Usuario, mostrar: (String) -> Unit, abrir: (Int) ->
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             when (v.estado) {
                                 EstadoViaje.PROGRAMADO -> {
-                                    Button(onClick = {
+                                    Button(onClick = { scope.launch {
                                         ItzRepository.iniciarViaje(v.idViaje)
                                             .onSuccess { abrir(v.idViaje) }
                                             .onFailure { mostrar(it.message ?: "Error") }
-                                    }) { Text("Iniciar viaje") }
-                                    OutlinedButton(onClick = { ItzRepository.cancelarViaje(v.idViaje).onFailure { mostrar(it.message ?: "Error") } }) { Text("Cancelar viaje") }
+                                     } }) { Text("Iniciar viaje") }
+                                    OutlinedButton(onClick = { scope.launch {  ItzRepository.cancelarViaje(v.idViaje).onFailure { mostrar(it.message ?: "Error") }  } }) { Text("Cancelar viaje") }
                                 }
                                 EstadoViaje.EN_CURSO -> Button(onClick = { abrir(v.idViaje) }) { Text("Ver viaje en curso") }
                                 EstadoViaje.FINALIZADO -> Button(onClick = { abrir(v.idViaje) }) { Text("Resumen y calificar") }
@@ -315,6 +322,7 @@ private fun AvisosTab(yo: Usuario) {
 // ============ Perfil ============
 @Composable
 private fun PerfilTab(yo: Usuario, mostrar: (String) -> Unit) {
+    val scope = rememberCoroutineScope()
     var tel by remember(yo.idUsuario) { mutableStateOf(yo.telefono) }
     var contacto by remember(yo.idUsuario) { mutableStateOf(yo.contactoConfianza) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -333,11 +341,11 @@ private fun PerfilTab(yo: Usuario, mostrar: (String) -> Unit) {
         Titulo("Datos de contacto")
         Campo(tel, { tel = it }, "Teléfono", KeyboardType.Phone)
         Campo(contacto, { contacto = it }, "Contacto de confianza (SOS)", KeyboardType.Phone)
-        Button(onClick = {
+        Button(onClick = { scope.launch {
             ItzRepository.actualizarPerfil(yo.idUsuario, tel, contacto)
                 .onSuccess { mostrar("Perfil actualizado") }
                 .onFailure { mostrar(it.message ?: "Error") }
-        }, modifier = Modifier.fillMaxWidth()) { Text("Guardar cambios") }
+         } }, modifier = Modifier.fillMaxWidth()) { Text("Guardar cambios") }
         OutlinedButton(onClick = { ItzRepository.cerrarSesion() }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.ExitToApp, contentDescription = null)
             Spacer(Modifier.width(8.dp))

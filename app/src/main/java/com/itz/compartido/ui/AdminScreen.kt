@@ -7,10 +7,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.itz.compartido.data.ItzRepository
+import kotlinx.coroutines.launch
 import com.itz.compartido.model.Rol
 import java.util.Locale
 
@@ -48,9 +50,12 @@ fun AdminScreen() {
 
 @Composable
 private fun UsuariosAdmin() {
+    val scope = rememberCoroutineScope()
+    var error by remember { mutableStateOf<String?>(null) }
     val usuarios by ItzRepository.usuarios.collectAsState()
     val lista = usuarios.filter { it.rol != Rol.ADMIN }
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
         items(lista, key = { it.idUsuario }) { u ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -67,8 +72,12 @@ private fun UsuariosAdmin() {
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (u.rol == Rol.CONDUCTOR && !u.documentosVerificados)
-                            Button(onClick = { ItzRepository.validarDocumentos(u.idUsuario) }) { Text("Validar documentos") }
-                        OutlinedButton(onClick = { ItzRepository.suspender(u.idUsuario, !u.suspendido) }) {
+                            Button(onClick = { scope.launch {
+                                ItzRepository.validarDocumentos(u.idUsuario).onFailure { error = it.message }
+                            } }) { Text("Validar documentos") }
+                        OutlinedButton(onClick = { scope.launch {
+                            ItzRepository.suspender(u.idUsuario, !u.suspendido).onFailure { error = it.message }
+                        } }) {
                             Text(if (u.suspendido) "Reactivar" else "Suspender")
                         }
                     }

@@ -6,9 +6,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -32,6 +37,33 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppRoot() {
     val ctx = LocalContext.current
+    val listo by ItzRepository.listo.collectAsState()
+    var errorInicio by remember { mutableStateOf<String?>(null) }
+    var intento by remember { mutableIntStateOf(0) }
+    LaunchedEffect(intento) {
+        errorInicio = null
+        try {
+            ItzRepository.inicializar(ctx)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            errorInicio = "No se pudo abrir la base de datos. Tus datos no se han borrado."
+        }
+    }
+    if (!listo) {
+        Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center) {
+                if (errorInicio == null) CircularProgressIndicator()
+                else {
+                    Text(errorInicio!!)
+                    Button(onClick = { intento++ }) { Text("Reintentar") }
+                }
+            }
+        }
+        return
+    }
     val sesion by ItzRepository.sesionId.collectAsState()
     val usuarios by ItzRepository.usuarios.collectAsState()
     val esAdmin = usuarios.firstOrNull { it.idUsuario == sesion }?.rol == Rol.ADMIN

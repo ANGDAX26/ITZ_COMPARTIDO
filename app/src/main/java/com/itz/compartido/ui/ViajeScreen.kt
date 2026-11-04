@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.itz.compartido.data.ItzRepository
+import kotlinx.coroutines.launch
 import com.itz.compartido.model.*
 import kotlinx.coroutines.delay
 import kotlin.math.floor
@@ -65,6 +66,7 @@ fun MapaSimulado(ruta: RutaSegura, progreso: Float, modifier: Modifier = Modifie
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ViajeScreen(idViaje: Int, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
     val yo = usuarioActual() ?: return
     val ctx = LocalContext.current
     val viajes by ItzRepository.viajes.collectAsState()
@@ -146,14 +148,14 @@ fun ViajeScreen(idViaje: Int, onBack: () -> Unit) {
 
             // Acciones del conductor
             if (esConductor && viaje.estado == EstadoViaje.EN_CURSO) {
-                Button(onClick = {
+                Button(onClick = { scope.launch {
                     ItzRepository.finalizarViaje(idViaje).onFailure { mensaje = it.message }
-                }, modifier = Modifier.fillMaxWidth()) { Text("Finalizar viaje") }
+                 } }, modifier = Modifier.fillMaxWidth()) { Text("Finalizar viaje") }
             }
             if (esConductor && viaje.estado == EstadoViaje.PROGRAMADO) {
-                Button(onClick = {
+                Button(onClick = { scope.launch {
                     ItzRepository.iniciarViaje(idViaje).onFailure { mensaje = it.message }
-                }, modifier = Modifier.fillMaxWidth()) { Text("Iniciar viaje") }
+                 } }, modifier = Modifier.fillMaxWidth()) { Text("Iniciar viaje") }
             }
 
             // RF-10: botón SOS
@@ -197,16 +199,17 @@ fun ViajeScreen(idViaje: Int, onBack: () -> Unit) {
                 text = { Text("Se avisará a la administración del ITZ y se abrirá un mensaje para tu contacto de confianza (${yo.contactoConfianza}) con tu ubicación.") },
                 confirmButton = {
                     Button(
-                        onClick = {
+                        onClick = { scope.launch {
                             confirmarSOS = false
                             ItzRepository.emitirSOS(yo.idUsuario, idViaje, lat, lon)
+                                .onFailure { mensaje = it.message }
                             val cuerpo = "ALERTA ITZ-Compartido: ${yo.nombre} necesita ayuda en el viaje " +
                                 "${viaje.origen.nombre} a ${viaje.destino.nombre}. " +
                                 "Ubicación: https://maps.google.com/?q=$lat,$lon"
                             val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${yo.contactoConfianza}"))
                                 .putExtra("sms_body", cuerpo)
                             try { ctx.startActivity(intent) } catch (e: ActivityNotFoundException) { }
-                        },
+                         } },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                     ) { Text("Enviar SOS") }
                 },
@@ -218,6 +221,7 @@ fun ViajeScreen(idViaje: Int, onBack: () -> Unit) {
 
 @Composable
 private fun CalificarCard(viajeId: Int, yoId: Int, a: Usuario) {
+    val scope = rememberCoroutineScope()
     val calificaciones by ItzRepository.calificaciones.collectAsState()
     val ya = calificaciones.any { it.viajeId == viajeId && it.deUsuarioId == yoId && it.aUsuarioId == a.idUsuario }
     var puntos by remember { mutableIntStateOf(0) }
@@ -241,9 +245,9 @@ private fun CalificarCard(viajeId: Int, yoId: Int, a: Usuario) {
                 }
                 OutlinedTextField(comentario, { comentario = it }, label = { Text("Comentario (opcional)") }, modifier = Modifier.fillMaxWidth())
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                Button(onClick = {
+                Button(onClick = { scope.launch {
                     ItzRepository.calificar(viajeId, yoId, a.idUsuario, puntos, comentario).onFailure { error = it.message }
-                }) { Text("Enviar calificación") }
+                 } }) { Text("Enviar calificación") }
             }
         }
     }

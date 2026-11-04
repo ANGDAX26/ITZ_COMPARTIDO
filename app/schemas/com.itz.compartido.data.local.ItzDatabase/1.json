@@ -1,0 +1,711 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "11cdfa51fc591dfa57c9941a1fab5eb0",
+    "entities": [
+      {
+        "tableName": "usuarios",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`idUsuario` INTEGER NOT NULL, `nombre` TEXT NOT NULL, `matricula` TEXT NOT NULL, `correoInstitucional` TEXT NOT NULL, `telefono` TEXT NOT NULL, `contactoConfianza` TEXT NOT NULL, `password_hash` TEXT NOT NULL, `rol` TEXT NOT NULL, `licencia` TEXT NOT NULL, `documentosVerificados` INTEGER NOT NULL, `suspendido` INTEGER NOT NULL, `calificacionProm` REAL NOT NULL, `numCalificaciones` INTEGER NOT NULL, `vehiculo_placas` TEXT, `vehiculo_modelo` TEXT, `vehiculo_color` TEXT, `vehiculo_capacidadAsientos` INTEGER, PRIMARY KEY(`idUsuario`))",
+        "fields": [
+          {
+            "fieldPath": "idUsuario",
+            "columnName": "idUsuario",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "matricula",
+            "columnName": "matricula",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correoInstitucional",
+            "columnName": "correoInstitucional",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "telefono",
+            "columnName": "telefono",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contactoConfianza",
+            "columnName": "contactoConfianza",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "password",
+            "columnName": "password_hash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rol",
+            "columnName": "rol",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "licencia",
+            "columnName": "licencia",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "documentosVerificados",
+            "columnName": "documentosVerificados",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "suspendido",
+            "columnName": "suspendido",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "calificacionProm",
+            "columnName": "calificacionProm",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "numCalificaciones",
+            "columnName": "numCalificaciones",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "vehiculo.placas",
+            "columnName": "vehiculo_placas",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "vehiculo.modelo",
+            "columnName": "vehiculo_modelo",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "vehiculo.color",
+            "columnName": "vehiculo_color",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "vehiculo.capacidadAsientos",
+            "columnName": "vehiculo_capacidadAsientos",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "idUsuario"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_usuarios_matricula",
+            "unique": true,
+            "columnNames": [
+              "matricula"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_usuarios_matricula` ON `${TABLE_NAME}` (`matricula`)"
+          },
+          {
+            "name": "index_usuarios_correoInstitucional",
+            "unique": true,
+            "columnNames": [
+              "correoInstitucional"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_usuarios_correoInstitucional` ON `${TABLE_NAME}` (`correoInstitucional`)"
+          }
+        ]
+      },
+      {
+        "tableName": "viajes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`idViaje` INTEGER NOT NULL, `conductorId` INTEGER NOT NULL, `zona` TEXT NOT NULL, `horaSalida` TEXT NOT NULL, `asientosDisponibles` INTEGER NOT NULL, `asientosTotales` INTEGER NOT NULL, `costoEstimado` REAL NOT NULL, `tipoPago` TEXT NOT NULL, `estado` TEXT NOT NULL, `origen_lat` REAL NOT NULL, `origen_lon` REAL NOT NULL, `origen_nombre` TEXT NOT NULL, `destino_lat` REAL NOT NULL, `destino_lon` REAL NOT NULL, `destino_nombre` TEXT NOT NULL, `ruta_puntosGPS` TEXT NOT NULL, `ruta_nivelRiesgo` TEXT NOT NULL, `ruta_zonasSeguras` TEXT NOT NULL, PRIMARY KEY(`idViaje`), FOREIGN KEY(`conductorId`) REFERENCES `usuarios`(`idUsuario`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "idViaje",
+            "columnName": "idViaje",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "conductorId",
+            "columnName": "conductorId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "zona",
+            "columnName": "zona",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "horaSalida",
+            "columnName": "horaSalida",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "asientosDisponibles",
+            "columnName": "asientosDisponibles",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "asientosTotales",
+            "columnName": "asientosTotales",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "costoEstimado",
+            "columnName": "costoEstimado",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tipoPago",
+            "columnName": "tipoPago",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origen.lat",
+            "columnName": "origen_lat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origen.lon",
+            "columnName": "origen_lon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origen.nombre",
+            "columnName": "origen_nombre",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "destino.lat",
+            "columnName": "destino_lat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "destino.lon",
+            "columnName": "destino_lon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "destino.nombre",
+            "columnName": "destino_nombre",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ruta.puntosGPS",
+            "columnName": "ruta_puntosGPS",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ruta.nivelRiesgo",
+            "columnName": "ruta_nivelRiesgo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ruta.zonasSeguras",
+            "columnName": "ruta_zonasSeguras",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "idViaje"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_viajes_conductorId",
+            "unique": false,
+            "columnNames": [
+              "conductorId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_viajes_conductorId` ON `${TABLE_NAME}` (`conductorId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "usuarios",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "conductorId"
+            ],
+            "referencedColumns": [
+              "idUsuario"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "solicitudes_viaje",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`idSolicitud` INTEGER NOT NULL, `viajeId` INTEGER NOT NULL, `pasajeroId` INTEGER NOT NULL, `fecha` TEXT NOT NULL, `estado` TEXT NOT NULL, PRIMARY KEY(`idSolicitud`), FOREIGN KEY(`viajeId`) REFERENCES `viajes`(`idViaje`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`pasajeroId`) REFERENCES `usuarios`(`idUsuario`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "idSolicitud",
+            "columnName": "idSolicitud",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "viajeId",
+            "columnName": "viajeId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pasajeroId",
+            "columnName": "pasajeroId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fecha",
+            "columnName": "fecha",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "idSolicitud"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_solicitudes_viaje_viajeId",
+            "unique": false,
+            "columnNames": [
+              "viajeId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_solicitudes_viaje_viajeId` ON `${TABLE_NAME}` (`viajeId`)"
+          },
+          {
+            "name": "index_solicitudes_viaje_pasajeroId",
+            "unique": false,
+            "columnNames": [
+              "pasajeroId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_solicitudes_viaje_pasajeroId` ON `${TABLE_NAME}` (`pasajeroId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "viajes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "viajeId"
+            ],
+            "referencedColumns": [
+              "idViaje"
+            ]
+          },
+          {
+            "table": "usuarios",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "pasajeroId"
+            ],
+            "referencedColumns": [
+              "idUsuario"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "calificaciones",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`viajeId` INTEGER NOT NULL, `deUsuarioId` INTEGER NOT NULL, `aUsuarioId` INTEGER NOT NULL, `puntuacion` INTEGER NOT NULL, `comentario` TEXT NOT NULL, PRIMARY KEY(`viajeId`, `deUsuarioId`, `aUsuarioId`), FOREIGN KEY(`viajeId`) REFERENCES `viajes`(`idViaje`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`deUsuarioId`) REFERENCES `usuarios`(`idUsuario`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`aUsuarioId`) REFERENCES `usuarios`(`idUsuario`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "viajeId",
+            "columnName": "viajeId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deUsuarioId",
+            "columnName": "deUsuarioId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aUsuarioId",
+            "columnName": "aUsuarioId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "puntuacion",
+            "columnName": "puntuacion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "comentario",
+            "columnName": "comentario",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "viajeId",
+            "deUsuarioId",
+            "aUsuarioId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_calificaciones_viajeId",
+            "unique": false,
+            "columnNames": [
+              "viajeId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_calificaciones_viajeId` ON `${TABLE_NAME}` (`viajeId`)"
+          },
+          {
+            "name": "index_calificaciones_deUsuarioId",
+            "unique": false,
+            "columnNames": [
+              "deUsuarioId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_calificaciones_deUsuarioId` ON `${TABLE_NAME}` (`deUsuarioId`)"
+          },
+          {
+            "name": "index_calificaciones_aUsuarioId",
+            "unique": false,
+            "columnNames": [
+              "aUsuarioId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_calificaciones_aUsuarioId` ON `${TABLE_NAME}` (`aUsuarioId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "viajes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "viajeId"
+            ],
+            "referencedColumns": [
+              "idViaje"
+            ]
+          },
+          {
+            "table": "usuarios",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "deUsuarioId"
+            ],
+            "referencedColumns": [
+              "idUsuario"
+            ]
+          },
+          {
+            "table": "usuarios",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "aUsuarioId"
+            ],
+            "referencedColumns": [
+              "idUsuario"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "pagos",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`viajeId` INTEGER NOT NULL, `monto` REAL NOT NULL, `tipo` TEXT NOT NULL, `personas` INTEGER NOT NULL, `montoPorPersona` REAL NOT NULL, `fecha` TEXT NOT NULL, PRIMARY KEY(`viajeId`), FOREIGN KEY(`viajeId`) REFERENCES `viajes`(`idViaje`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "viajeId",
+            "columnName": "viajeId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "monto",
+            "columnName": "monto",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tipo",
+            "columnName": "tipo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "personas",
+            "columnName": "personas",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "montoPorPersona",
+            "columnName": "montoPorPersona",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fecha",
+            "columnName": "fecha",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "viajeId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_pagos_viajeId",
+            "unique": false,
+            "columnNames": [
+              "viajeId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pagos_viajeId` ON `${TABLE_NAME}` (`viajeId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "viajes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "viajeId"
+            ],
+            "referencedColumns": [
+              "idViaje"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "notificaciones",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `usuarioId` INTEGER NOT NULL, `titulo` TEXT NOT NULL, `mensaje` TEXT NOT NULL, `hora` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`usuarioId`) REFERENCES `usuarios`(`idUsuario`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "usuarioId",
+            "columnName": "usuarioId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "titulo",
+            "columnName": "titulo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mensaje",
+            "columnName": "mensaje",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hora",
+            "columnName": "hora",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_notificaciones_usuarioId",
+            "unique": false,
+            "columnNames": [
+              "usuarioId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_notificaciones_usuarioId` ON `${TABLE_NAME}` (`usuarioId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "usuarios",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "usuarioId"
+            ],
+            "referencedColumns": [
+              "idUsuario"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "alertas_sos",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `usuarioId` INTEGER NOT NULL, `viajeId` INTEGER NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, `hora` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`usuarioId`) REFERENCES `usuarios`(`idUsuario`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`viajeId`) REFERENCES `viajes`(`idViaje`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "usuarioId",
+            "columnName": "usuarioId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "viajeId",
+            "columnName": "viajeId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hora",
+            "columnName": "hora",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_alertas_sos_usuarioId",
+            "unique": false,
+            "columnNames": [
+              "usuarioId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_alertas_sos_usuarioId` ON `${TABLE_NAME}` (`usuarioId`)"
+          },
+          {
+            "name": "index_alertas_sos_viajeId",
+            "unique": false,
+            "columnNames": [
+              "viajeId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_alertas_sos_viajeId` ON `${TABLE_NAME}` (`viajeId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "usuarios",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "usuarioId"
+            ],
+            "referencedColumns": [
+              "idUsuario"
+            ]
+          },
+          {
+            "table": "viajes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "viajeId"
+            ],
+            "referencedColumns": [
+              "idViaje"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '11cdfa51fc591dfa57c9941a1fab5eb0')"
+    ]
+  }
+}

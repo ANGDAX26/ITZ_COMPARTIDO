@@ -1,5 +1,6 @@
 package com.itz.compartido.model
 
+import androidx.room.*
 import java.time.LocalDateTime
 import java.time.LocalTime
 import kotlin.math.PI
@@ -35,6 +36,11 @@ data class Vehiculo(
 )
 
 /** Usuario + Conductor + Pasajero (la herencia del diagrama se modela con [rol] y [vehiculo]). */
+@Entity(
+    tableName = "usuarios",
+    primaryKeys = ["idUsuario"],
+    indices = [Index(value = ["matricula"], unique = true), Index(value = ["correoInstitucional"], unique = true)]
+)
 data class Usuario(
     val idUsuario: Int,
     val nombre: String,
@@ -42,9 +48,9 @@ data class Usuario(
     val correoInstitucional: String,
     val telefono: String,
     val contactoConfianza: String,
-    val password: String,
+    @ColumnInfo(name = "password_hash") val password: String,
     val rol: Rol = Rol.PASAJERO,
-    val vehiculo: Vehiculo? = null,
+    @Embedded(prefix = "vehiculo_") val vehiculo: Vehiculo? = null,
     val licencia: String = "",
     val documentosVerificados: Boolean = false,
     val suspendido: Boolean = false,
@@ -88,11 +94,17 @@ data class RutaSegura(
     }
 }
 
+@Entity(
+    tableName = "viajes",
+    primaryKeys = ["idViaje"],
+    indices = [Index(value = ["conductorId"])],
+    foreignKeys = [ForeignKey(entity = Usuario::class, parentColumns = ["idUsuario"], childColumns = ["conductorId"], onDelete = ForeignKey.RESTRICT)]
+)
 data class Viaje(
     val idViaje: Int,
     val conductorId: Int,
-    val origen: GeoPunto,
-    val destino: GeoPunto,
+    @Embedded(prefix = "origen_") val origen: GeoPunto,
+    @Embedded(prefix = "destino_") val destino: GeoPunto,
     val zona: String,
     val horaSalida: LocalTime,
     val asientosDisponibles: Int,
@@ -100,9 +112,15 @@ data class Viaje(
     val costoEstimado: Double,
     val tipoPago: TipoPago,
     val estado: EstadoViaje,
-    val ruta: RutaSegura
+    @Embedded(prefix = "ruta_") val ruta: RutaSegura
 )
 
+@Entity(
+    tableName = "solicitudes_viaje",
+    primaryKeys = ["idSolicitud"],
+    indices = [Index(value = ["viajeId"]), Index(value = ["pasajeroId"])],
+    foreignKeys = [ForeignKey(entity = Viaje::class, parentColumns = ["idViaje"], childColumns = ["viajeId"], onDelete = ForeignKey.RESTRICT), ForeignKey(entity = Usuario::class, parentColumns = ["idUsuario"], childColumns = ["pasajeroId"], onDelete = ForeignKey.RESTRICT)]
+)
 data class Solicitud(
     val idSolicitud: Int,
     val viajeId: Int,
@@ -111,6 +129,12 @@ data class Solicitud(
     val estado: EstadoSolicitud
 )
 
+@Entity(
+    tableName = "calificaciones",
+    primaryKeys = ["viajeId", "deUsuarioId", "aUsuarioId"],
+    indices = [Index(value = ["viajeId"]), Index(value = ["deUsuarioId"]), Index(value = ["aUsuarioId"])],
+    foreignKeys = [ForeignKey(entity = Viaje::class, parentColumns = ["idViaje"], childColumns = ["viajeId"], onDelete = ForeignKey.RESTRICT), ForeignKey(entity = Usuario::class, parentColumns = ["idUsuario"], childColumns = ["deUsuarioId"], onDelete = ForeignKey.RESTRICT), ForeignKey(entity = Usuario::class, parentColumns = ["idUsuario"], childColumns = ["aUsuarioId"], onDelete = ForeignKey.RESTRICT)]
+)
 data class Calificacion(
     val viajeId: Int,
     val deUsuarioId: Int,
@@ -119,6 +143,12 @@ data class Calificacion(
     val comentario: String
 )
 
+@Entity(
+    tableName = "pagos",
+    primaryKeys = ["viajeId"],
+    indices = [Index(value = ["viajeId"])],
+    foreignKeys = [ForeignKey(entity = Viaje::class, parentColumns = ["idViaje"], childColumns = ["viajeId"], onDelete = ForeignKey.RESTRICT)]
+)
 data class Pago(
     val viajeId: Int,
     val monto: Double,
@@ -128,6 +158,12 @@ data class Pago(
     val fecha: LocalDateTime
 )
 
+@Entity(
+    tableName = "notificaciones",
+    primaryKeys = ["id"],
+    indices = [Index(value = ["usuarioId"])],
+    foreignKeys = [ForeignKey(entity = Usuario::class, parentColumns = ["idUsuario"], childColumns = ["usuarioId"], onDelete = ForeignKey.RESTRICT)]
+)
 data class Notificacion(
     val id: Int,
     val usuarioId: Int,
@@ -136,6 +172,12 @@ data class Notificacion(
     val hora: LocalDateTime
 )
 
+@Entity(
+    tableName = "alertas_sos",
+    primaryKeys = ["id"],
+    indices = [Index(value = ["usuarioId"]), Index(value = ["viajeId"])],
+    foreignKeys = [ForeignKey(entity = Usuario::class, parentColumns = ["idUsuario"], childColumns = ["usuarioId"], onDelete = ForeignKey.RESTRICT), ForeignKey(entity = Viaje::class, parentColumns = ["idViaje"], childColumns = ["viajeId"], onDelete = ForeignKey.RESTRICT)]
+)
 data class AlertaSOS(
     val id: Int,
     val usuarioId: Int,

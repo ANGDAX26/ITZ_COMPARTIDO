@@ -1,18 +1,28 @@
 package com.itz.compartido.data
 
+import android.content.Context
+import androidx.room.withTransaction
+import com.itz.compartido.data.local.ItzDatabase
+import com.itz.compartido.data.local.PasswordHasher
 import com.itz.compartido.model.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
+import com.itz.compartido.data.local.EstadoPersistente
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Repositorio en memoria que simula el backend del MVP (servidor + base de datos).
- * Para producción se reemplaza por una API REST / Firebase manteniendo esta misma interfaz.
+ * Repositorio local Room. Serializa operaciones y confirma su persistencia antes de devolver éxito.
+ * Los StateFlow mantienen la interfaz reactiva de las pantallas del MVP.
  */
 object ItzRepository {
 
@@ -49,7 +59,7 @@ object ItzRepository {
     )
 
     // ---------------- Estado ----------------
-    private val _usuarios = MutableStateFlow(
+    private val _usuarios = EstadoPersistente(
         listOf(
             Usuario(1, "Administración ITZ", "10000001", "admin$DOMINIO_ITZ", "7341000000", "7341000001",
                 "admin123", Rol.ADMIN, documentosVerificados = true),
@@ -66,7 +76,7 @@ object ItzRepository {
                 false, false)
         )
     )
-    private val _viajes = MutableStateFlow(
+    private val _viajes = EstadoPersistente(
         listOf(
             nuevoViaje(2, "Jojutla", ZONAS.getValue("Jojutla"), ITZ, LocalTime.of(7, 0), 3, 45.0, TipoPago.GASOLINA),
             nuevoViaje(2, "Jojutla", ITZ, ZONAS.getValue("Jojutla"), LocalTime.of(15, 30), 3, 45.0, TipoPago.GASOLINA),
@@ -74,24 +84,142 @@ object ItzRepository {
             nuevoViaje(3, "Cuernavaca", ZONAS.getValue("Cuernavaca"), ITZ, LocalTime.of(6, 0), 2, 220.0, TipoPago.MIXTO)
         )
     )
-    private val _solicitudes = MutableStateFlow<List<Solicitud>>(emptyList())
-    private val _calificaciones = MutableStateFlow<List<Calificacion>>(emptyList())
-    private val _pagos = MutableStateFlow<Map<Int, Pago>>(emptyMap())
-    private val _avisos = MutableStateFlow<List<Notificacion>>(emptyList())
-    private val _alertas = MutableStateFlow<List<AlertaSOS>>(emptyList())
-    private val _sesionId = MutableStateFlow<Int?>(null)
+    private val _solicitudes = EstadoPersistente<List<Solicitud>>(emptyList())
+    private val _calificaciones = EstadoPersistente<List<Calificacion>>(emptyList())
+    private val _pagos = EstadoPersistente<Map<Int, Pago>>(emptyMap())
+    private val _avisos = EstadoPersistente<List<Notificacion>>(emptyList())
+    private val _alertas = EstadoPersistente<List<AlertaSOS>>(emptyList())
+    private val _sesionId = EstadoPersistente<Int?>(null)
 
-    val usuarios: StateFlow<List<Usuario>> = _usuarios
-    val viajes: StateFlow<List<Viaje>> = _viajes
-    val solicitudes: StateFlow<List<Solicitud>> = _solicitudes
-    val calificaciones: StateFlow<List<Calificacion>> = _calificaciones
-    val pagos: StateFlow<Map<Int, Pago>> = _pagos
-    val avisos: StateFlow<List<Notificacion>> = _avisos
-    val alertas: StateFlow<List<AlertaSOS>> = _alertas
-    val sesionId: StateFlow<Int?> = _sesionId
+    val usuarios: StateFlow<List<Usuario>> = _usuarios.flow
+    val viajes: StateFlow<List<Viaje>> = _viajes.flow
+    val solicitudes: StateFlow<List<Solicitud>> = _solicitudes.flow
+    val calificaciones: StateFlow<List<Calificacion>> = _calificaciones.flow
+    val pagos: StateFlow<Map<Int, Pago>> = _pagos.flow
+    val avisos: StateFlow<List<Notificacion>> = _avisos.flow
+    val alertas: StateFlow<List<AlertaSOS>> = _alertas.flow
+    val sesionId: StateFlow<Int?> = _sesionId.flow
 
     /** Eventos para disparar notificaciones push locales (RF-12). */
     val eventos: SharedFlow<Notificacion> = MutableSharedFlow<Notificacion>(extraBufferCapacity = 32)
+
+
+    private val estados by lazy { listOf(_usuarios, _viajes, _solicitudes, _calificaciones, _pagos, _avisos, _alertas) }
+    private val mutex = Mutex()
+    private lateinit var database: ItzDatabase
+    private val eventosPendientes = mutableListOf<Notificacion>()
+    private val _listo = MutableStateFlow(false)
+    val listo: StateFlow<Boolean> = _listo
+
+    /** Called before exposing forms; sample data is inserted only on an empty database. */
+    suspend fun inicializar(context: Context, nombreBaseDatos: String = "itz_compartido.db") = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            if (_listo.value) return@withLock
+            if (!::database.isInitialized) database = ItzDatabase.abrir(context, nombreBaseDatos)
+            database.withTransaction {
+                val dao = database.datos()
+                if (dao.usuarios().isEmpty()) {
+                    _usuarios.value = _usuarios.value.map {
+                        if (it.password.startsWith("pbkdf2:")) it
+                        else it.copy(password = PasswordHasher.hash(it.password))
+                    }
+                    guardar(null)
+                }
+                restaurar(Estado(dao.usuarios(), dao.viajes(), dao.solicitudes(),
+                    dao.calificaciones(), dao.pagos().associateBy { it.viajeId },
+                    dao.avisos(), dao.alertas(), null))
+            }
+            idUsuario.set(maxOf(100, _usuarios.value.maxOfOrNull { it.idUsuario } ?: 0))
+            idViaje.set(_viajes.value.maxOfOrNull { it.idViaje } ?: 0)
+            idSolicitud.set(_solicitudes.value.maxOfOrNull { it.idSolicitud } ?: 0)
+            idAviso.set(_avisos.value.maxOfOrNull { it.id } ?: 0)
+            idSos.set(_alertas.value.maxOfOrNull { it.id } ?: 0)
+            _listo.value = true
+        }
+    }
+
+    private data class Estado(
+        val usuarios: List<Usuario>, val viajes: List<Viaje>, val solicitudes: List<Solicitud>,
+        val calificaciones: List<Calificacion>, val pagos: Map<Int, Pago>,
+        val avisos: List<Notificacion>, val alertas: List<AlertaSOS>, val sesion: Int?
+    )
+
+    private fun estado() = Estado(_usuarios.value, _viajes.value, _solicitudes.value,
+        _calificaciones.value, _pagos.value, _avisos.value, _alertas.value, _sesionId.value)
+
+    private fun restaurar(e: Estado) {
+        _usuarios.value = e.usuarios; _viajes.value = e.viajes
+        _solicitudes.value = e.solicitudes; _calificaciones.value = e.calificaciones
+        _pagos.value = e.pagos; _avisos.value = e.avisos; _alertas.value = e.alertas
+        _sesionId.value = e.sesion
+    }
+
+    private fun guardar(anterior: Estado?) {
+        val dao = database.datos()
+        dao.usuarios(_usuarios.value.filter { it !in (anterior?.usuarios ?: emptyList()) })
+        dao.viajes(_viajes.value.filter { it !in (anterior?.viajes ?: emptyList()) })
+        dao.solicitudes(_solicitudes.value.filter { it !in (anterior?.solicitudes ?: emptyList()) })
+        dao.calificaciones(_calificaciones.value.filter { it !in (anterior?.calificaciones ?: emptyList()) })
+        dao.pagos(_pagos.value.values.filter { it !in (anterior?.pagos?.values ?: emptyList()) })
+        dao.avisos(_avisos.value.filter { it !in (anterior?.avisos ?: emptyList()) })
+        dao.alertas(_alertas.value.filter { it !in (anterior?.alertas ?: emptyList()) })
+    }
+
+    /** A failed write rolls back both SQLite and the in-memory view; notifications follow commit. */
+    private suspend fun <T> persistir(operacion: () -> Result<T>): Result<T> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            // Finish commit and publication together even if navigation cancels the calling scope.
+            withContext(NonCancellable) {
+                check(_listo.value) { "La base de datos todavía no está lista" }
+                val anterior = estado()
+                eventosPendientes.clear()
+                estados.forEach { it.comenzar() }
+                try {
+                    val result = database.withTransaction {
+                        operacion().also { if (it.isSuccess) guardar(anterior) }
+                    }
+                    if (result.isFailure) estados.forEach { it.cancelar() }
+                    else {
+                        estados.forEach { it.confirmar() }
+                        eventosPendientes.forEach { (eventos as MutableSharedFlow<Notificacion>).tryEmit(it) }
+                    }
+                    result
+                } catch (e: CancellationException) {
+                    estados.forEach { it.cancelar() }
+                    throw e
+                } catch (e: Exception) {
+                    estados.forEach { it.cancelar() }
+                    Result.failure(IllegalStateException("No se pudieron guardar los cambios. Intenta de nuevo.", e))
+                } finally {
+                    eventosPendientes.clear()
+                }
+            }
+        }
+    }
+
+    suspend fun registrar(
+        nombre: String, matricula: String, correo: String,
+        telefono: String, contacto: String, password: String
+    ): Result<Usuario> = persistir { registrarEnMemoria(nombre, matricula, correo, telefono, contacto, password) }
+        .onSuccess { _sesionId.value = it.idUsuario }
+    suspend fun actualizarPerfil(id: Int, telefono: String, contacto: String): Result<Unit> = persistir { actualizarPerfilEnMemoria(id, telefono, contacto) }
+    suspend fun registrarConductor(
+        id: Int, placas: String, modelo: String, color: String, capacidad: Int?, licencia: String
+    ): Result<Unit> = persistir { registrarConductorEnMemoria(id, placas, modelo, color, capacidad, licencia) }
+    suspend fun publicarViaje(
+        conductorId: Int, zona: String, haciaItz: Boolean, punto: String, horaTxt: String,
+        asientos: Int?, costo: Double?, tipo: TipoPago
+    ): Result<Viaje> = persistir { publicarViajeEnMemoria(conductorId, zona, haciaItz, punto, horaTxt, asientos, costo, tipo) }
+    suspend fun solicitarLugar(viajeId: Int, pasajeroId: Int): Result<Unit> = persistir { solicitarLugarEnMemoria(viajeId, pasajeroId) }
+    suspend fun responderSolicitud(idSolicitud: Int, aceptar: Boolean): Result<Unit> = persistir { responderSolicitudEnMemoria(idSolicitud, aceptar) }
+    suspend fun cancelarSolicitud(idSolicitud: Int): Result<Unit> = persistir { cancelarSolicitudEnMemoria(idSolicitud) }
+    suspend fun iniciarViaje(idViaje: Int): Result<Unit> = persistir { iniciarViajeEnMemoria(idViaje) }
+    suspend fun finalizarViaje(idViaje: Int): Result<Pago> = persistir { finalizarViajeEnMemoria(idViaje) }
+    suspend fun cancelarViaje(idViaje: Int): Result<Unit> = persistir { cancelarViajeEnMemoria(idViaje) }
+    suspend fun calificar(viajeId: Int, de: Int, a: Int, puntos: Int, comentario: String): Result<Unit> = persistir { calificarEnMemoria(viajeId, de, a, puntos, comentario) }
+    suspend fun emitirSOS(usuarioId: Int, viajeId: Int, lat: Double, lon: Double): Result<Unit> = persistir { emitirSOSEnMemoria(usuarioId, viajeId, lat, lon); Result.success(Unit) }
+    suspend fun validarDocumentos(id: Int): Result<Unit> = persistir { validarDocumentosEnMemoria(id); Result.success(Unit) }
+    suspend fun suspender(id: Int, suspender: Boolean): Result<Unit> = persistir { suspenderEnMemoria(id, suspender); Result.success(Unit) }
 
     // ---------------- Utilidades ----------------
     private fun <T> fallo(msg: String): Result<T> = Result.failure(IllegalArgumentException(msg))
@@ -111,7 +239,7 @@ object ItzRepository {
     private fun notificar(usuarioId: Int, titulo: String, mensaje: String) {
         val n = Notificacion(idAviso.incrementAndGet(), usuarioId, titulo, mensaje, LocalDateTime.now())
         _avisos.update { listOf(n) + it }
-        (eventos as MutableSharedFlow<Notificacion>).tryEmit(n)
+        eventosPendientes.add(n)
     }
 
     private fun notificarAdmins(titulo: String, mensaje: String) =
@@ -120,7 +248,7 @@ object ItzRepository {
     fun nombreDe(id: Int) = usuario(id)?.nombre ?: "Usuario"
 
     // ---------------- RF-01: registro y sesión ----------------
-    fun registrar(
+    private fun registrarEnMemoria(
         nombre: String, matricula: String, correo: String,
         telefono: String, contacto: String, password: String
     ): Result<Usuario> {
@@ -141,25 +269,26 @@ object ItzRepository {
         if (msg != null) return fallo(msg)
         val u = Usuario(
             idUsuario.incrementAndGet(), nombre.trim(), m, c,
-            telefono.trim(), contacto.trim(), password
+            telefono.trim(), contacto.trim(), PasswordHasher.hash(password)
         )
         _usuarios.update { it + u }
-        _sesionId.value = u.idUsuario
         return Result.success(u)
     }
 
-    fun login(correo: String, password: String): Result<Usuario> {
-        val u = _usuarios.value.firstOrNull {
-            it.correoInstitucional == correo.trim().lowercase() && it.password == password
-        } ?: return fallo("Correo o contraseña incorrectos")
-        if (u.suspendido) return fallo("Tu cuenta está suspendida. Contacta a la administración del ITZ")
-        _sesionId.value = u.idUsuario
-        return Result.success(u)
+    suspend fun login(correo: String, password: String): Result<Usuario> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val u = _usuarios.value.firstOrNull {
+                it.correoInstitucional == correo.trim().lowercase() && PasswordHasher.verify(password, it.password)
+            } ?: return@withContext fallo("Correo o contraseña incorrectos")
+            if (u.suspendido) return@withContext fallo("Tu cuenta está suspendida. Contacta a la administración del ITZ")
+            _sesionId.value = u.idUsuario
+            Result.success(u)
+        }
     }
 
     fun cerrarSesion() { _sesionId.value = null }
 
-    fun actualizarPerfil(id: Int, telefono: String, contacto: String): Result<Unit> {
+    private fun actualizarPerfilEnMemoria(id: Int, telefono: String, contacto: String): Result<Unit> {
         if (!telefono.trim().matches(Regex("[0-9]{10}"))) return fallo("El teléfono debe tener 10 dígitos")
         if (!contacto.trim().matches(Regex("[0-9]{10}"))) return fallo("El contacto de confianza debe tener 10 dígitos")
         actualizarUsuario(id) { it.copy(telefono = telefono.trim(), contactoConfianza = contacto.trim()) }
@@ -167,7 +296,7 @@ object ItzRepository {
     }
 
     // ---------------- RF-02: registro como conductor ----------------
-    fun registrarConductor(
+    private fun registrarConductorEnMemoria(
         id: Int, placas: String, modelo: String, color: String, capacidad: Int?, licencia: String
     ): Result<Unit> {
         val msg = when {
@@ -192,7 +321,7 @@ object ItzRepository {
     }
 
     // ---------------- RF-03: publicar viaje ----------------
-    fun publicarViaje(
+    private fun publicarViajeEnMemoria(
         conductorId: Int, zona: String, haciaItz: Boolean, punto: String, horaTxt: String,
         asientos: Int?, costo: Double?, tipo: TipoPago
     ): Result<Viaje> {
@@ -221,7 +350,7 @@ object ItzRepository {
     // (el filtrado por zona, horario y calificación se hace en la UI con estos flujos)
 
     // ---------------- RF-05: solicitudes ----------------
-    fun solicitarLugar(viajeId: Int, pasajeroId: Int): Result<Unit> {
+    private fun solicitarLugarEnMemoria(viajeId: Int, pasajeroId: Int): Result<Unit> {
         val v = viaje(viajeId) ?: return fallo("Viaje no encontrado")
         if (v.estado != EstadoViaje.PROGRAMADO) return fallo("Este viaje ya no admite solicitudes")
         if (v.conductorId == pasajeroId) return fallo("No puedes solicitar lugar en tu propio viaje")
@@ -237,7 +366,7 @@ object ItzRepository {
         return Result.success(Unit)
     }
 
-    fun responderSolicitud(idSolicitud: Int, aceptar: Boolean): Result<Unit> {
+    private fun responderSolicitudEnMemoria(idSolicitud: Int, aceptar: Boolean): Result<Unit> {
         val s = _solicitudes.value.firstOrNull { it.idSolicitud == idSolicitud } ?: return fallo("Solicitud no encontrada")
         val v = viaje(s.viajeId) ?: return fallo("Viaje no encontrado")
         if (s.estado != EstadoSolicitud.PENDIENTE) return fallo("La solicitud ya fue atendida")
@@ -253,7 +382,7 @@ object ItzRepository {
         return Result.success(Unit)
     }
 
-    fun cancelarSolicitud(idSolicitud: Int): Result<Unit> {
+    private fun cancelarSolicitudEnMemoria(idSolicitud: Int): Result<Unit> {
         val s = _solicitudes.value.firstOrNull { it.idSolicitud == idSolicitud } ?: return fallo("Solicitud no encontrada")
         val v = viaje(s.viajeId) ?: return fallo("Viaje no encontrado")
         if (v.estado != EstadoViaje.PROGRAMADO) return fallo("El viaje ya inició o terminó")
@@ -265,7 +394,7 @@ object ItzRepository {
     }
 
     // ---------------- Ciclo de vida del viaje ----------------
-    fun iniciarViaje(idViaje: Int): Result<Unit> {
+    private fun iniciarViajeEnMemoria(idViaje: Int): Result<Unit> {
         val v = viaje(idViaje) ?: return fallo("Viaje no encontrado")
         if (v.estado != EstadoViaje.PROGRAMADO) return fallo("El viaje no está programado")
         val aceptadas = _solicitudes.value.filter { it.viajeId == idViaje && it.estado == EstadoSolicitud.ACEPTADA }
@@ -276,7 +405,7 @@ object ItzRepository {
     }
 
     /** RF-08: el costo se divide entre el conductor y los pasajeros del viaje. */
-    fun finalizarViaje(idViaje: Int): Result<Pago> {
+    private fun finalizarViajeEnMemoria(idViaje: Int): Result<Pago> {
         val v = viaje(idViaje) ?: return fallo("Viaje no encontrado")
         if (v.estado != EstadoViaje.EN_CURSO) return fallo("El viaje no está en curso")
         val aceptadas = _solicitudes.value.filter { it.viajeId == idViaje && it.estado == EstadoSolicitud.ACEPTADA }
@@ -290,7 +419,7 @@ object ItzRepository {
         return Result.success(pago)
     }
 
-    fun cancelarViaje(idViaje: Int): Result<Unit> {
+    private fun cancelarViajeEnMemoria(idViaje: Int): Result<Unit> {
         val v = viaje(idViaje) ?: return fallo("Viaje no encontrado")
         if (v.estado != EstadoViaje.PROGRAMADO) return fallo("Solo se pueden cancelar viajes programados")
         val afectadas = _solicitudes.value.filter {
@@ -308,7 +437,7 @@ object ItzRepository {
     fun yaCalifico(viajeId: Int, de: Int, a: Int) =
         _calificaciones.value.any { it.viajeId == viajeId && it.deUsuarioId == de && it.aUsuarioId == a }
 
-    fun calificar(viajeId: Int, de: Int, a: Int, puntos: Int, comentario: String): Result<Unit> {
+    private fun calificarEnMemoria(viajeId: Int, de: Int, a: Int, puntos: Int, comentario: String): Result<Unit> {
         if (puntos !in 1..5) return fallo("Elige de 1 a 5 estrellas")
         if (yaCalifico(viajeId, de, a)) return fallo("Ya calificaste a este usuario en este viaje")
         _calificaciones.update { it + Calificacion(viajeId, de, a, puntos, comentario.trim()) }
@@ -321,18 +450,18 @@ object ItzRepository {
     }
 
     // ---------------- RF-10: SOS ----------------
-    fun emitirSOS(usuarioId: Int, viajeId: Int, lat: Double, lon: Double) {
+    private fun emitirSOSEnMemoria(usuarioId: Int, viajeId: Int, lat: Double, lon: Double) {
         _alertas.update { it + AlertaSOS(idSos.incrementAndGet(), usuarioId, viajeId, lat, lon, LocalDateTime.now()) }
         notificarAdmins("ALERTA SOS", "${nombreDe(usuarioId)} activó el botón de emergencia en el viaje #$viajeId.")
     }
 
     // ---------------- RF-11: administración ----------------
-    fun validarDocumentos(id: Int) {
+    private fun validarDocumentosEnMemoria(id: Int) {
         actualizarUsuario(id) { it.copy(documentosVerificados = true) }
         notificar(id, "Documentos validados", "Ya puedes publicar viajes como conductor.")
     }
 
-    fun suspender(id: Int, suspender: Boolean) = actualizarUsuario(id) { it.copy(suspendido = suspender) }
+    private fun suspenderEnMemoria(id: Int, suspender: Boolean) = actualizarUsuario(id) { it.copy(suspendido = suspender) }
 
     fun reporte(): ReporteUso {
         val califs = _calificaciones.value
